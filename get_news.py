@@ -2,7 +2,7 @@ import re
 from typing import List, Optional
 from bs4 import BeautifulSoup
 
-from base import BaseScraper
+from base.base import BaseScraper
 
 
 class NewsScraper(BaseScraper):
@@ -29,11 +29,14 @@ class NewsScraper(BaseScraper):
         """Extracts and concatenates text content from specified elements."""
 
         if source_name == "DonanimHaber":
-            source_classes = self.SOURCES_CLASS_NAME.get(source_name, ['', ''])
-            p_id, imp_id = source_classes[0], source_classes[1] if len(source_classes) > 1 else ''
-            paragraphs = [
-                soup.find(id=f"{base_id}-{p_id}-{i}") for i in range(100)
-            ] + [soup.find(id=f"{base_id}-{imp_id}-{i}") for i in range(100)]
+            source_classes = self.SOURCES_CLASS_NAME.get(source_name, ["", ""])
+            p_id, imp_id = (
+                source_classes[0],
+                source_classes[1] if len(source_classes) > 1 else "",
+            )
+            paragraphs = [soup.find(id=f"{base_id}-{p_id}-{i}") for i in range(100)] + [
+                soup.find(id=f"{base_id}-{imp_id}-{i}") for i in range(100)
+            ]
             content = [self.extract_text(p) for p in paragraphs if p]
         else:
             content_div = self.get_content(
@@ -62,23 +65,35 @@ class NewsScraper(BaseScraper):
         return self.articles
 
 
-def scrape_donanimhaber_articles(user_id: int, urls: List, source_name: str) -> List:
-    """Scrape articles from DonanimHaber based on provided URLs."""
+def scrape_articles(user_id: int, urls: List[str], source_name: str) -> dict:
+    """Scrapes articles from a given news source based on provided URLs.
 
-    def extract_id_from_url(url: str) -> str:
+    If the source is 'DonanimHaber', it extracts the article ID from the URLs.
+    For other sources, it directly uses the URLs.
+
+    Args:
+        user_id (int): The user ID for the scraper.
+        urls (List[str]): List of URLs to scrape.
+        source_name (str): The name of the news source.
+
+    Returns:
+        A dictionary where keys are URLs and values are the scraped article content.
+    """
+
+    def extract_id_from_url(url: str) -> Optional[str]:
         """Extract the article ID from the URL."""
         match = re.search(r"--(\d+)$", url)
         return match.group(1) if match else None
 
     scraper = NewsScraper(user_id=user_id)
-    base_ids = [extract_id_from_url(url) for url in urls if extract_id_from_url(url)]
-    return scraper.get_articles(urls, base_ids, source_name=source_name)
 
+    if source_name == "DonanimHaber":
+        base_ids = [extract_id_from_url(url) for url in urls if extract_id_from_url(url)]
+        articles = scraper.get_articles(urls, base_ids, source_name=source_name)
+    else:
+        articles = scraper.get_articles(urls, source_name=source_name)
 
-def get_news_articles(user_id: int, urls: List, source_name: str) -> List:
-    """Scrapes articles from news source."""
-    scraper = NewsScraper(user_id=user_id)
-    return scraper.get_articles(urls, source_name)
+    return articles
 
 
 if __name__ == "__main__":
@@ -86,5 +101,7 @@ if __name__ == "__main__":
         "https://www.donanimhaber.com/xiaomi-smart-door-lock-2-pro-tanitildi-iste-fiyati--180758"
     ]
 
-    articles = scrape_donanimhaber_articles(user_id=1, urls=urls, source_name = "DonanimHaber")
+    articles = scrape_articles(
+        user_id=1, urls=urls, source_name="DonanimHaber"
+    )
     print(articles)
