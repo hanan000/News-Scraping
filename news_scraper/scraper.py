@@ -8,7 +8,7 @@ import re
 from typing import Dict, Iterable, List, Mapping, Optional
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from .base import DEFAULT_TIMEOUT, BaseScraper
 from .config import load_config
@@ -56,6 +56,15 @@ def normalize_source(name: str) -> str:
     return key
 
 
+def element_text(element: Tag) -> str:
+    """Return an element's text with whitespace collapsed.
+
+    Unlike ``get_text(strip=True)``, this keeps the spaces around inline tags
+    such as links, so ``"read <a>more</a> here"`` does not become ``"readmorehere"``.
+    """
+    return " ".join(element.get_text().split())
+
+
 def extract_article_id(url: str) -> Optional[str]:
     """Return the numeric article id at the end of a DonanimHaber URL, if any."""
     match = _DONANIMHABER_ID.search(url)
@@ -88,7 +97,7 @@ class NewsScraper(BaseScraper):
             paragraphs = self._donanimhaber_paragraphs(soup, url)
         else:
             paragraphs = [
-                p.get_text(strip=True)
+                element_text(p)
                 for p in self.find_paragraphs(soup, class_name=self.selectors[source])
             ]
         return " ".join(text for text in paragraphs if text)
@@ -105,7 +114,7 @@ class NewsScraper(BaseScraper):
             rf"^{article_id}-(?:{'|'.join(map(re.escape, prefixes))})-\d+$"
         )
         # find_all keeps document order, so text and image paragraphs stay interleaved.
-        texts = (element.get_text(strip=True) for element in soup.find_all(id=id_pattern))
+        texts = (element_text(element) for element in soup.find_all(id=id_pattern))
         return [text for text in texts if len(text) > MIN_PARAGRAPH_LENGTH]
 
     def scrape(self, urls: Iterable[str], source: str) -> Dict[str, str]:
