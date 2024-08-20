@@ -1,19 +1,13 @@
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict
 from bs4 import BeautifulSoup
 
 from base.base import BaseScraper
+from utils import get_conf
 
 
 class NewsScraper(BaseScraper):
     """Scrapes product data from various news sources."""
-
-    SOURCES_CLASS_NAME = {
-        "Webrazzi": "single-post-content",
-        "DonanimHaber": ["paragraph", "imgparagraph"],
-        "Wired": "body__inner-container",
-        "The Verge": "duet--article--article-body-component-container",
-    }
 
     def __init__(self, user_id: int):
         super().__init__(user_id=user_id)
@@ -28,8 +22,8 @@ class NewsScraper(BaseScraper):
     def parse_content(self, soup: BeautifulSoup, base_id: str, source_name: str) -> str:
         """Extracts and concatenates text content from specified elements."""
 
-        if source_name == "DonanimHaber":
-            source_classes = self.SOURCES_CLASS_NAME.get(source_name, ["", ""])
+        if source_name == "DONANIMHABER":
+            source_classes = eval(get_conf(source_name, ["", ""]))
             p_id, imp_id = (
                 source_classes[0],
                 source_classes[1] if len(source_classes) > 1 else "",
@@ -42,7 +36,7 @@ class NewsScraper(BaseScraper):
             content_div = self.get_content(
                 soup,
                 tag="div",
-                class_name=self.SOURCES_CLASS_NAME.get(source_name, ""),
+                class_name=get_conf(source_name, ""),
                 scraping_type="News",
             )
             content = [p.get_text(strip=True) for p in content_div] or []
@@ -65,7 +59,7 @@ class NewsScraper(BaseScraper):
         return self.articles
 
 
-def scrape_articles(user_id: int, urls: List[str], source_name: str) -> dict:
+def scrape_articles(user_id: int, urls: List[str], source_name: str) -> Dict[str, str]:
     """Scrapes articles from a given news source based on provided URLs.
 
     If the source is 'DonanimHaber', it extracts the article ID from the URLs.
@@ -81,27 +75,32 @@ def scrape_articles(user_id: int, urls: List[str], source_name: str) -> dict:
     """
 
     def extract_id_from_url(url: str) -> Optional[str]:
-        """Extract the article ID from the URL."""
+        """Extracts the article ID from the URL."""
         match = re.search(r"--(\d+)$", url)
         return match.group(1) if match else None
 
     scraper = NewsScraper(user_id=user_id)
 
-    if source_name == "DonanimHaber":
-        base_ids = [extract_id_from_url(url) for url in urls if extract_id_from_url(url)]
-        articles = scraper.get_articles(urls, base_ids, source_name=source_name)
-    else:
-        articles = scraper.get_articles(urls, source_name=source_name)
-
-    return articles
+    base_ids = (
+        [extract_id_from_url(url) for url in urls] if source_name == "DONANIMHABER" else None
+    )
+    return scraper.get_articles(urls, base_ids, source_name)
 
 
 if __name__ == "__main__":
     urls = [
-        "https://www.donanimhaber.com/xiaomi-smart-door-lock-2-pro-tanitildi-iste-fiyati--180758"
-    ]
+        "https://www.donanimhaber.com/xiaomi-smart-door-lock-2-pro-tanitildi-iste-fiyati--180758",
+        # "https://www.theverge.com/2024/8/20/24224277/disney-wrongful-death-lawsuit-waiving-arbitration",
+        # "https://webrazzi.com/2024/08/20/apple-podcastsin-web-uygulamasi-yayina-alindi"
+        # 'https://www.wired.com/sponsored/story/bespoke-sound-montblanc-wireless-earphones-mtb03/'
 
-    articles = scrape_articles(
-        user_id=1, urls=urls, source_name="DonanimHaber"
-    )
+
+    ]
+    # source_names
+    # THE_VERGE
+    # DONANIMHABER
+    # WIRED
+    # WEBRAZZI
+
+    articles = scrape_articles(user_id=1, urls=urls, source_name="DONANIMHABER")
     print(articles)
